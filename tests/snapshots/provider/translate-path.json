@@ -4661,6 +4661,29 @@
       "stream": "https://api.perplexity.ai/chat/completions"
     }
   },
+  "perplexity-agent": {
+    "format": "openai-responses",
+    "headers": {
+      "apiKey": {
+        "Accept": "text/event-stream",
+        "Authorization": "Bearer <TOK>",
+        "Content-Type": "application/json"
+      },
+      "nonStream": {
+        "Authorization": "Bearer <TOK>",
+        "Content-Type": "application/json"
+      },
+      "oauth": {
+        "Accept": "text/event-stream",
+        "Authorization": "Bearer <TOK>",
+        "Content-Type": "application/json"
+      }
+    },
+    "url": {
+      "nonStream": "https://api.perplexity.ai/v1/responses",
+      "stream": "https://api.perplexity.ai/v1/responses"
+    }
+  },
   "perplexity-web": {
     "format": "openai",
     "headers": {

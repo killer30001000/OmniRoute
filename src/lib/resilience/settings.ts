@@ -45,6 +45,16 @@ export const DEFAULT_REQUEST_QUEUE_MAX_WAIT_MS = (() => {
   return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 15000;
 })();
 
+// Limiter-managed execution backstop (Bottleneck `expiration`). Deliberately
+// separate from the queue-wait budget: non-incremental gateways (Console Go /
+// Command Code) buffer whole generations before first bytes, so legitimate
+// executions run minutes. Default 10 min; the backstop only catches executors
+// without their own upstream timeout.
+export const DEFAULT_REQUEST_QUEUE_EXECUTION_MAX_WAIT_MS = (() => {
+  const parsed = Number(process.env.RATE_LIMIT_EXECUTION_MAX_WAIT_MS || "600000");
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 600000;
+})();
+
 // Issue #6593: opt-in admission cap on the local rate-limit queue depth.
 // Default 0 = disabled (unbounded queue, today's behavior unchanged).
 export const DEFAULT_REQUEST_QUEUE_MAX_DEPTH = (() => {
@@ -60,6 +70,7 @@ export const DEFAULT_RESILIENCE_SETTINGS: ResilienceSettings = {
     concurrentRequests: DEFAULT_API_LIMITS.concurrentRequests,
     globalConcurrentRequests: 0,
     maxWaitMs: DEFAULT_REQUEST_QUEUE_MAX_WAIT_MS,
+    executionMaxWaitMs: DEFAULT_REQUEST_QUEUE_EXECUTION_MAX_WAIT_MS,
     maxQueueDepth: DEFAULT_REQUEST_QUEUE_MAX_DEPTH,
   },
   connectionCooldown: {
@@ -212,6 +223,7 @@ function buildLegacyFallback(settings: JsonRecord): ResilienceSettings {
       globalConcurrentRequests:
         DEFAULT_RESILIENCE_SETTINGS.requestQueue.globalConcurrentRequests,
       maxWaitMs: DEFAULT_RESILIENCE_SETTINGS.requestQueue.maxWaitMs,
+      executionMaxWaitMs: DEFAULT_RESILIENCE_SETTINGS.requestQueue.executionMaxWaitMs,
       maxQueueDepth: DEFAULT_RESILIENCE_SETTINGS.requestQueue.maxQueueDepth,
     },
     connectionCooldown: {
