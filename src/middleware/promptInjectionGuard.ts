@@ -33,7 +33,7 @@ export function createInjectionGuard(options: PromptInjectionGuardrailOptions = 
 
     const decision = evaluatePromptInjection(body, options, {
       disabledGuardrails: resolveDisabledGuardrails({ body }),
-      log: options.logger || console,
+      log: options.logger ?? null,
     });
     return {
       blocked: decision.blocked,

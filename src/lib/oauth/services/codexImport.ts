@@ -27,8 +27,19 @@ export type CodexImportPayload = {
   email: string;
   expiresAt: string;
   testStatus: "active";
+  isActive: true;
+  errorCode: null;
+  lastError: null;
+  lastErrorAt: null;
+  lastErrorType: null;
+  lastErrorSource: null;
+  backoffLevel: 0;
+  rateLimitedUntil: null;
+  priority?: number;
   providerSpecificData?: {
     chatgptAccountId?: string;
+    // Canonical alias consumed by the existing Codex workspace upsert path.
+    workspaceId?: string;
     chatgptPlanType?: string;
   };
 };
@@ -224,7 +235,12 @@ export function normalizeCodexImportRecord(input: unknown): NormalizeResult {
   const expiresAt = parseExpiry(rec.expired) ?? parseAccessTokenExp(accessToken);
 
   const providerSpecificData: CodexImportPayload["providerSpecificData"] = {};
-  if (chatgptAccountId) providerSpecificData.chatgptAccountId = chatgptAccountId;
+  if (chatgptAccountId) {
+    providerSpecificData.chatgptAccountId = chatgptAccountId;
+    // CodexSwitcher stores this stable value as account_id; mirror it into
+    // workspaceId so createProviderConnection performs its existing upsert.
+    providerSpecificData.workspaceId = chatgptAccountId;
+  }
   if (chatgptPlanType) providerSpecificData.chatgptPlanType = chatgptPlanType;
 
   const payload: CodexImportPayload = {
@@ -235,8 +251,20 @@ export function normalizeCodexImportRecord(input: unknown): NormalizeResult {
     email,
     expiresAt,
     testStatus: "active",
+    // Fresh imported OAuth credentials supersede a previous refresh failure.
+    isActive: true,
+    errorCode: null,
+    lastError: null,
+    lastErrorAt: null,
+    lastErrorType: null,
+    lastErrorSource: null,
+    backoffLevel: 0,
+    rateLimitedUntil: null,
   };
   if (idToken) payload.idToken = idToken;
+  if (typeof rec.priority === "number" && Number.isInteger(rec.priority) && rec.priority > 0) {
+    payload.priority = rec.priority;
+  }
   if (Object.keys(providerSpecificData).length > 0) {
     payload.providerSpecificData = providerSpecificData;
   }

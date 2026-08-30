@@ -1024,6 +1024,8 @@
     "logs": "Logs",
     "webhooks": "Webhooks",
     "webhooksSubtitle": "Get notified of events",
+    "logExport": "Log export",
+    "logExportSubtitle": "Ship call logs out",
     "combosSubtitle": "Group providers for failover",
     "batchSubtitle": "Process multiple requests",
     "contextCavemanSubtitle": "Prompt compression",
@@ -2400,7 +2402,15 @@
     "bypassProviderQuota": "Bypass provider quota cutoffs",
     "bypassProviderQuotaDescription": "Allows this key to ignore upstream provider/account cutoff policy during routing. API key USD quotas still apply.",
     "quotaPill": "QUOTA",
-    "quotaModeOnly": "qtSd-only"
+    "quotaModeOnly": "qtSd-only",
+    "exclusiveLease": "Exclusive Lease",
+    "exclusiveLeaseNoticeTitle": "Exclusive Lease",
+    "exclusiveLeaseNoticeDesc": "This API key has exclusive lease permissions for dedicated connection routing.",
+    "allConnections": "All connections",
+    "onlySelectedConnections": "Only selected connections",
+    "selectAtLeastOneConnection": "Select at least one connection or choose All connections.",
+    "allConnectionsDesc": "This key can use any active connection.",
+    "restrictedToConnections": "Restricted to {count} connection{count, plural, one {} other {s}}."
   },
   "auditLog": {
     "title": "Audit Log",
@@ -2925,7 +2935,8 @@
       "letta": "Letta CLI agent with persistent memory and tool use",
       "prime-agent": "Prime Agent — self-improving RLM coding harness with OpenAI-compatible provider support",
       "warp": "Warp AI terminal with custom provider support",
-      "agent-deck": "Agent Deck multi-agent orchestrator"
+      "agent-deck": "Agent Deck multi-agent orchestrator",
+      "5dive": "5dive — self-hosted fleet of coding agents; one auth profile points them all at OmniRoute"
     },
     "guides": {
       "cursor": {
@@ -11258,6 +11269,11 @@
       "copy": "Copy",
       "autoscrollOn": "Autoscroll: on",
       "autoscrollOff": "Autoscroll: off",
+      "collapseAllLevels": "Collapse all",
+      "collapseOneLevel": "Collapse one level",
+      "currentExpandLevel": "Current expand level",
+      "expandOneLevel": "Expand one level",
+      "expandAllLevels": "Expand all",
       "payload": {
         "clientRawRequest": "Client Raw Request",
         "clientRequest": "Client Request",

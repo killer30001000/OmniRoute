@@ -19,6 +19,16 @@ export const GLM_ANTHROPIC_DEFAULT_BASE_URLS = Object.freeze({
 
 export const GLM_SHARED_MODELS = Object.freeze([
   {
+    id: "glm-5.3-flash",
+    name: "GLM 5.3 Flash",
+    contextLength: 1000000,
+    maxOutputTokens: 131072,
+    toolCalling: true,
+    supportsReasoning: true,
+    supportedThinkingEfforts: ["low", "high", "max"],
+    supportsVision: true,
+  },
+  {
     // GLM-5.3 exposes low|high|max reasoning_effort (default max); -high/-low
     // are OmniRoute aliases resolved by GlmExecutor::parseGlmEffortTier.
     // https://docs.z.ai/guides/llm/glm-5.3

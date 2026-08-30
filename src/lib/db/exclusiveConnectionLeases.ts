@@ -40,6 +40,13 @@ type LeaseRow = {
   state: ExclusiveLeaseState;
   expires_at: string;
 };
+type LeaseStatusRow = LeaseRow & {
+  connection_provider: string;
+  connection_auth_type: string | null;
+  connection_name: string | null;
+  connection_email: string | null;
+  connection_display_name: string | null;
+};
 type LeaseSuccess = {
   kind: "ACQUIRED" | "REUSED" | "TRANSITIONED";
   lease: ExclusiveConnectionLease;
@@ -90,6 +97,21 @@ function expire(now: string): number {
 }
 function active(column: "lease_owner_hash" | "connection_id", value: string) {
   return database().prepare(`${ACTIVE_SQL}${column} = ?`).get(value) as LeaseRow | undefined;
+}
+
+function configuredConnectionName(row: LeaseStatusRow): string | null {
+  const name = row.connection_name?.trim();
+  if (!name || name.includes("@")) return null;
+
+  if (row.connection_auth_type === "oauth" || row.connection_auth_type === "access_token") {
+    const normalized = name.toLowerCase();
+    const generatedFallbacks = [row.connection_email, row.connection_display_name]
+      .map((value) => value?.trim().toLowerCase())
+      .filter((value): value is string => Boolean(value));
+    if (generatedFallbacks.includes(normalized)) return null;
+  }
+
+  return name;
 }
 
 function historical(ownerHash: string, generation: number) {
@@ -190,6 +212,44 @@ function update<T extends string>(input: {
 
 export function reconcileExpiredExclusiveConnectionLeases(now?: string): number {
   return immediate(() => expire(timestamp(now)));
+}
+
+export function getExclusiveConnectionLeaseStatus(input: {
+  leaseOwnerId: string;
+  generation: number;
+  apiKeyId: string;
+  now?: string;
+}): {
+  lease: ExclusiveConnectionLease;
+  provider: string;
+  connectionName: string | null;
+} | null {
+  const ownerHash = hashLeaseOwnerId(input.leaseOwnerId);
+  const now = timestamp(input.now);
+  return immediate(() => {
+    expire(now);
+    const row = database()
+      .prepare(
+        `SELECT leases.*, connections.provider AS connection_provider,
+                connections.auth_type AS connection_auth_type,
+                connections.name AS connection_name,
+                connections.email AS connection_email,
+                connections.display_name AS connection_display_name
+         FROM exclusive_connection_leases leases
+         INNER JOIN provider_connections connections ON connections.id = leases.connection_id
+         WHERE leases.lease_owner_hash = ? AND leases.api_key_id = ?
+           AND leases.generation = ? AND leases.state = 'ACTIVE' AND leases.expires_at > ?
+         LIMIT 1`
+      )
+      .get(ownerHash, input.apiKeyId, input.generation, now) as LeaseStatusRow | undefined;
+    return row
+      ? {
+          lease: lease(row),
+          provider: row.connection_provider,
+          connectionName: configuredConnectionName(row),
+        }
+      : null;
+  });
 }
 
 export function acquireExclusiveConnectionLease(input: {

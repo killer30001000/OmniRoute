@@ -96,6 +96,7 @@ test("catalog suppresses inferred tiers for every GLM registry entry without a p
 
 test("catalog exposes only GLM effort tiers that each provider can route", () => {
   const routedTiers = new Map<string, string[]>([
+    ["glm-5.3-flash", ["low", "high", "max"]],
     ["glm-5.3", ["low", "high", "max"]],
     ["glm-5.3-high", ["high"]],
     ["glm-5.3-low", ["low"]],
@@ -139,9 +140,10 @@ for (const provider of ["glm", "glm-cn", "glmt"]) {
   });
 }
 
-test("zai advertises the GLM-5.3 base model only (DefaultExecutor sends ids verbatim)", () => {
+test("zai advertises the GLM-5.3 base model and GLM-5.3 Flash (DefaultExecutor sends ids verbatim)", () => {
   const ids = modelIds("zai");
   assert.ok(ids.includes("glm-5.3"), `zai should advertise glm-5.3; got ${ids.join(", ")}`);
+  assert.ok(ids.includes("glm-5.3-flash"), `zai should advertise glm-5.3-flash; got ${ids.join(", ")}`);
   for (const alias of ["glm-5.3-high", "glm-5.3-low", "glm-5.3-max"]) {
     assert.ok(
       !ids.includes(alias),
@@ -150,17 +152,18 @@ test("zai advertises the GLM-5.3 base model only (DefaultExecutor sends ids verb
   }
 });
 
-test("modelSpecs carries 1M/128K specs for all GLM-5.3 ids", () => {
-  for (const id of GLM_5_3_IDS) {
+test("modelSpecs carries 1M/128K specs for all GLM-5.3 ids including flash", () => {
+  for (const id of [...GLM_5_3_IDS, "glm-5.3-flash"]) {
     const spec = MODEL_SPECS[id];
     assert.ok(spec, `MODEL_SPECS should include ${id}`);
     assert.equal(spec.contextWindow, 1_000_000);
     assert.equal(spec.maxOutputTokens, 131_072);
     assert.equal(spec.supportsThinking, true);
   }
+  assert.equal(MODEL_SPECS["glm-5.3-flash"]?.supportsVision, true);
 });
 
-test("GLM_PRICING covers the GLM-5.3 ids with GLM-5.2-parity rates", () => {
+test("GLM_PRICING covers the GLM-5.3 ids with GLM-5.2-parity rates and GLM-5.3-Flash rates", () => {
   const reference = GLM_PRICING["glm-5.2"];
   assert.ok(reference, "glm-5.2 pricing reference missing");
   for (const id of GLM_5_3_IDS) {
@@ -168,6 +171,11 @@ test("GLM_PRICING covers the GLM-5.3 ids with GLM-5.2-parity rates", () => {
     assert.ok(pricing, `GLM_PRICING should include ${id}`);
     assert.deepEqual(pricing, reference);
   }
+  const flashPricing = GLM_PRICING["glm-5.3-flash"];
+  assert.ok(flashPricing, "glm-5.3-flash pricing missing");
+  assert.equal(flashPricing.input, 0.075);
+  assert.equal(flashPricing.output, 0.25);
+  assert.equal(flashPricing.cached, 0.015);
 });
 
 test("GlmExecutor resolves glm-5.3-high to reasoning_effort=high on the OpenAI coding transport", () => {

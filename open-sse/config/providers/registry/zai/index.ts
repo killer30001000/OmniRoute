@@ -19,6 +19,7 @@ export const zaiProvider: RegistryEntry = {
   // unknown IDs. Use the `glm` provider for effort tiers. Vision models are
   // likewise omitted (handled elsewhere).
   models: [
+    { id: "glm-5.3-flash", name: "GLM 5.3 Flash" },
     { id: "glm-5.3", name: "GLM 5.3" },
     { id: "glm-5.2", name: "GLM 5.2" },
     { id: "glm-5.1", name: "GLM 5.1" },

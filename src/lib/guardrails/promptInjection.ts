@@ -111,7 +111,7 @@ function shouldBlock(detections: Detection[], threshold: "low" | "medium" | "hig
 }
 
 function getLogger(options: PromptInjectionGuardrailOptions, context: GuardrailContext) {
-  return options.logger || context.log || console;
+  return options.logger ?? context.log ?? null;
 }
 
 function emitGuardrailLog(
