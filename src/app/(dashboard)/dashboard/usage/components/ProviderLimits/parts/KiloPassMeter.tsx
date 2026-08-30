@@ -66,6 +66,7 @@ export default function KiloPassMeter({
       used: usedAmount,
       total: totalAmount,
       remaining: remainingAmount,
+      progressValue: Math.min(totalAmount, usedAmount),
       boundary,
       paidFill: Math.min(usedPercent, boundary),
       bonusFill: Math.max(0, usedPercent - boundary),
@@ -100,7 +101,7 @@ export default function KiloPassMeter({
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={model.total}
-        aria-valuenow={model.used}
+        aria-valuenow={model.progressValue}
         aria-valuetext={`${formatCurrency(model.used)} of ${formatCurrency(model.total)}`}
         aria-label={translateUsageOrFallback(t, "kiloPassMeterLabel", "Kilo Pass usage meter")}
         className="relative h-2 rounded-full overflow-hidden bg-black/[0.06] dark:bg-white/[0.06]"

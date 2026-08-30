@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { formatQuotaLabel, getBarColor, getQuotaRemainingPercentage, topQuotas } from "../utils";
 import QuotaMiniBar from "../QuotaMiniBar";
 import KiloPassMeter from "./KiloPassMeter";
+import { isKiloPassDisplayRow } from "../quotaParsing";
 import { translateUsageOrFallback } from "../i18nFallback";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -133,15 +134,15 @@ export default function QuotaCardBody({
   return (
     <div className="flex flex-col gap-1 px-3 pb-2">
       {visible.map((q, i) =>
-        q?.kiloPass && kiloPassRow ? (
+        isKiloPassDisplayRow(q) ? (
           <KiloPassMeter
             key={`${q.name}-${q.modelKey ?? ""}-${i}`}
-            base={kiloPassRow.kiloPassBase ?? q.kiloPassBase ?? 0}
-            bonus={kiloPassRow.kiloPassBonus ?? q.kiloPassBonus ?? 0}
+            base={q.kiloPassBase ?? kiloPassRow?.kiloPassBase ?? 0}
+            bonus={q.kiloPassBonus ?? kiloPassRow?.kiloPassBonus ?? 0}
             used={q.used}
             total={q.total}
             remaining={q.remaining}
-            nextBillingAt={kiloPassRow.resetAt ?? null}
+            nextBillingAt={q.resetAt ?? kiloPassRow?.resetAt ?? null}
             balance={q.kiloPassBalance ?? null}
           />
         ) : (

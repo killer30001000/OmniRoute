@@ -21,6 +21,7 @@ import QuotaMiniBar from "../QuotaMiniBar";
 import { translateUsageOrFallback, type UsageTranslationValues } from "../i18nFallback";
 import {
   findKiloPassQuotaRow,
+  isKiloPassDisplayRow,
   hasFixedQuotaOrder,
   hasCanonicalWindowOrder,
   sortQuotasByWindow,
@@ -173,23 +174,23 @@ function QuotaDetailRow({
 }) {
   const t = useTranslations("usage");
   const canHide = typeof onHideQuota === "function" && !q.isCredits && !q.isResetCredits;
+  if (isKiloPassDisplayRow(q)) {
+    return (
+      <KiloPassMeter
+        base={q.kiloPassBase ?? kiloPassRow?.kiloPassBase ?? 0}
+        bonus={q.kiloPassBonus ?? kiloPassRow?.kiloPassBonus ?? 0}
+        used={q.used}
+        total={q.total}
+        remaining={q.remaining}
+        nextBillingAt={q.resetAt ?? kiloPassRow?.resetAt ?? null}
+        balance={q.kiloPassBalance ?? null}
+      />
+    );
+  }
+
   if (q.isResetCredits) {
     const count = Number(q.creditCount ?? q.remaining ?? 0);
     const colors = getBarColor(q.remainingPercentage ?? 100);
-    if (q?.kiloPass && kiloPassRow) {
-      return (
-        <KiloPassMeter
-          base={kiloPassRow.kiloPassBase ?? q.kiloPassBase ?? 0}
-          bonus={kiloPassRow.kiloPassBonus ?? q.kiloPassBonus ?? 0}
-          used={q.used}
-          total={q.total}
-          remaining={q.remaining}
-          nextBillingAt={kiloPassRow.resetAt ?? null}
-          balance={q.kiloPassBalance ?? null}
-        />
-      );
-    }
-
     return (
       <div className="flex min-h-[34px] items-center justify-between gap-2 py-1">
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] font-medium leading-none text-text-main">
