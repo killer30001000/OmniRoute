@@ -179,6 +179,20 @@ test("case A: Base 50, Usage 30, Bonus 5, Remaining 25", async () => {
   assert.equal(quotas.kiloPassRemaining.remaining, 25);
 });
 
+test("Kilo Pass total and remaining preserve distinct usage semantics", () => {
+  const result = buildKiloPassUsageResult({
+    currentPeriodBaseCreditsUsd: 49,
+    currentPeriodBonusCreditsUsd: 24.5,
+    currentPeriodUsageUsd: 47.95,
+    nextBillingAt: null,
+  });
+
+  assert.equal(result.quotas.kiloPassUsage.total, 73.5);
+  assert.equal(result.quotas.kiloPassUsage.used, 47.95);
+  assert.equal(result.quotas.kiloPassRemaining.remaining, 25.55);
+  assert.notEqual(result.quotas.kiloPassUsage.used, result.quotas.kiloPassRemaining.remaining);
+});
+
 // Case B: nextBillingAt attached to period quotas
 
 test("case B: nextBillingAt normalized and attached", async () => {
