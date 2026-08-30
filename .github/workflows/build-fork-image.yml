@@ -69,6 +69,12 @@ jobs:
           context: .
           target: runner-base
           platforms: linux/amd64
+          # Webpack fallback (same as the official docker-publish.yml):
+          # Turbopack's native/Rust memory is not bound by the V8 heap flag
+          # and exceeds the 16 GB GitHub-hosted runner during the Next.js
+          # production build (ResourceExhausted, see Dockerfile #10060/#7518).
+          build-args: |
+            OMNIROUTE_USE_TURBOPACK=0
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
