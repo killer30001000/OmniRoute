@@ -11,7 +11,10 @@ import assert from "node:assert/strict";
 import { USAGE_SUPPORTED_PROVIDERS } from "../../src/shared/constants/providers.ts";
 import { supportsProviderQuota } from "../../src/shared/utils/providerQuotaVisibility.ts";
 import { USAGE_FETCHER_PROVIDERS, getUsageForProvider } from "../../open-sse/services/usage.ts";
-import { parseQuotaData } from "../../src/app/(dashboard)/dashboard/usage/components/ProviderLimits/quotaParsing.ts";
+import {
+  findKiloPassQuotaRow,
+  parseQuotaData,
+} from "../../src/app/(dashboard)/dashboard/usage/components/ProviderLimits/quotaParsing.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -104,7 +107,7 @@ test("kilocode balance quota parses as USD credit row in the Dashboard parser", 
   assert.equal(row.remainingPercentage, 100, "funded wallet must not read as exhausted");
 });
 
-test("kilocode balance + Kilo Pass quotas parse five USD credit rows", async () => {
+test("kilocode balance + Kilo Pass quotas collapse into one meter row (balance untouched)", async () => {
   const balanceQuota = {
     used: 0,
     total: 0,
@@ -165,23 +168,51 @@ test("kilocode balance + Kilo Pass quotas parse five USD credit rows", async () 
       kiloPassRemaining: remainingQuota,
     },
   };
+
   const rows = parseQuotaData("kilocode", usage) as Array<{
+    name?: string;
     isCredits?: boolean;
     currency?: string;
     creditCount?: number;
     displayName?: string;
+    unlimited?: boolean;
+    kiloPass?: boolean;
+    kiloPassBase?: number;
+    kiloPassBonus?: number;
+    kiloPassBalance?: number;
+    used?: number;
+    total?: number;
+    remaining?: number;
+    remainingPercentage?: number;
+    resetAt?: string | null;
   }>;
-  assert.equal(rows.length, 5);
-  for (const row of rows) {
-    assert.equal(row.isCredits, true);
-    assert.equal(row.currency, "USD");
-  }
-  const byName = new Map(rows.map((r) => [r.displayName, r.creditCount]));
-  assert.equal(byName.get("Balance (USD)"), 11.51);
-  assert.equal(byName.get("Base Credits"), 50);
-  assert.equal(byName.get("Bonus Credits"), 5);
-  assert.equal(byName.get("Kilo Pass Usage"), 25);
-  assert.equal(byName.get("Pass Remaining"), 25);
+  assert.equal(
+    rows.length,
+    2,
+    "four raw Kilo Pass keys must collapse into one meter row; balance stays separate"
+  );
+
+  const balance = rows.find((r) => r.name === "balance");
+  assert.ok(balance, "personal balance row must survive");
+  assert.equal(balance?.isCredits, true);
+  assert.equal(balance?.currency, "USD");
+  assert.equal(balance?.creditCount, 11.51);
+  assert.equal(balance?.unlimited, true);
+
+  const pass = findKiloPassQuotaRow(rows);
+  assert.ok(pass, "collapsed Kilo Pass row must be discoverable via findKiloPassQuotaRow");
+  assert.equal(pass?.kiloPass, true);
+  assert.equal(pass?.displayName, "Kilo Pass");
+  assert.equal(pass?.currency, "USD");
+  assert.equal(pass?.kiloPassBase, 50);
+  assert.equal(pass?.kiloPassBonus, 5);
+  assert.equal(pass?.kiloPassBalance, 11.51, "wallet balance rides along for meter footer");
+  assert.equal(pass?.used, 30);
+  assert.equal(pass?.total, 55, "meter total must be base + bonus");
+  assert.equal(pass?.remaining, 25);
+  assert.equal(pass?.remainingPercentage, (25 / 55) * 100);
+  assert.equal(pass?.resetAt, "2026-09-15T00:00:00.000Z");
+  assert.equal(pass?.unlimited, false);
 });
 
 test("getUsageForProvider returns Kilo Pass quotas through dispatcher", async () => {

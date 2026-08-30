@@ -19,7 +19,13 @@ import {
 } from "../utils";
 import QuotaMiniBar from "../QuotaMiniBar";
 import { translateUsageOrFallback, type UsageTranslationValues } from "../i18nFallback";
-import { hasFixedQuotaOrder, hasCanonicalWindowOrder, sortQuotasByWindow } from "../quotaParsing";
+import {
+  findKiloPassQuotaRow,
+  hasFixedQuotaOrder,
+  hasCanonicalWindowOrder,
+  sortQuotasByWindow,
+} from "../quotaParsing";
+import KiloPassMeter from "./KiloPassMeter";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
@@ -153,11 +159,14 @@ interface Props {
 
 function QuotaDetailRow({
   q,
+  kiloPassRow = null,
   onHideQuota,
   onOpenResetCredits,
   loadingResetCredits = false,
 }: {
   q: any;
+  /** Collapsed Kilo Pass display row; present only on kilocode provider cards. */
+  kiloPassRow?: any | null;
   onHideQuota?: (quota: any) => void;
   onOpenResetCredits?: () => void;
   loadingResetCredits?: boolean;
@@ -167,6 +176,20 @@ function QuotaDetailRow({
   if (q.isResetCredits) {
     const count = Number(q.creditCount ?? q.remaining ?? 0);
     const colors = getBarColor(q.remainingPercentage ?? 100);
+    if (q?.kiloPass && kiloPassRow) {
+      return (
+        <KiloPassMeter
+          base={kiloPassRow.kiloPassBase ?? q.kiloPassBase ?? 0}
+          bonus={kiloPassRow.kiloPassBonus ?? q.kiloPassBonus ?? 0}
+          used={q.used}
+          total={q.total}
+          remaining={q.remaining}
+          nextBillingAt={kiloPassRow.resetAt ?? null}
+          balance={q.kiloPassBalance ?? null}
+        />
+      );
+    }
+
     return (
       <div className="flex min-h-[34px] items-center justify-between gap-2 py-1">
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] font-medium leading-none text-text-main">
@@ -332,6 +355,10 @@ export default function QuotaCardExpanded({
   );
   const hiddenCount = sortedQuotas.length - visibleQuotas.length;
 
+  // Only Kilo Code cards host the dedicated Kilo Pass meter; the collapsed display row carries
+  // the derived meter values while balance/renewal metadata render below it.
+  const kiloPassRow = providerId === "kilocode" ? findKiloPassQuotaRow(sortedQuotas) : null;
+
   const refreshedLabel = refreshedAt
     ? new Date(refreshedAt).toLocaleTimeString([], {
         hour: "2-digit",
@@ -367,6 +394,7 @@ export default function QuotaCardExpanded({
             <QuotaDetailRow
               key={`${q.name}-${q.modelKey ?? ""}-${i}`}
               q={q}
+              kiloPassRow={kiloPassRow}
               onHideQuota={onHideQuota}
               onOpenResetCredits={q.isResetCredits ? onOpenResetCredits : undefined}
               loadingResetCredits={loadingResetCredits}

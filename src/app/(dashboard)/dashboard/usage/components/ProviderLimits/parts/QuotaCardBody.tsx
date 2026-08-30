@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { formatQuotaLabel, getBarColor, getQuotaRemainingPercentage, topQuotas } from "../utils";
 import QuotaMiniBar from "../QuotaMiniBar";
+import KiloPassMeter from "./KiloPassMeter";
 import { translateUsageOrFallback } from "../i18nFallback";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -23,6 +24,8 @@ interface Props {
   loading: boolean;
   error: string | null;
   message: string | null;
+  /** Collapsed Kilo Pass display row for dedicated meter rendering (kilocode only). */
+  kiloPassRow?: any | null;
 }
 
 const MAX_VISIBLE_DEFAULT = 3;
@@ -88,6 +91,7 @@ export default function QuotaCardBody({
   loading,
   error,
   message,
+  kiloPassRow = null,
 }: Props) {
   const t = useTranslations("usage");
 
@@ -128,9 +132,22 @@ export default function QuotaCardBody({
 
   return (
     <div className="flex flex-col gap-1 px-3 pb-2">
-      {visible.map((q, i) => (
-        <QuotaRow key={`${q.name}-${q.modelKey ?? ""}-${i}`} q={q} />
-      ))}
+      {visible.map((q, i) =>
+        q?.kiloPass && kiloPassRow ? (
+          <KiloPassMeter
+            key={`${q.name}-${q.modelKey ?? ""}-${i}`}
+            base={kiloPassRow.kiloPassBase ?? q.kiloPassBase ?? 0}
+            bonus={kiloPassRow.kiloPassBonus ?? q.kiloPassBonus ?? 0}
+            used={q.used}
+            total={q.total}
+            remaining={q.remaining}
+            nextBillingAt={kiloPassRow.resetAt ?? null}
+            balance={q.kiloPassBalance ?? null}
+          />
+        ) : (
+          <QuotaRow key={`${q.name}-${q.modelKey ?? ""}-${i}`} q={q} />
+        )
+      )}
       {hidden > 0 && (
         <div className="text-[10px] text-text-muted italic pt-0.5">+{hidden} more</div>
       )}
