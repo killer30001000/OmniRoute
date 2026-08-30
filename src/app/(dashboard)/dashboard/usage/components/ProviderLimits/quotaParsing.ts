@@ -314,7 +314,7 @@ function parseProviderQuotas(providerId: string, data: any) {
   if (providerId === "codex") return parseCodex(data);
   if (providerId === "claude") return parseClaude(data);
   if (providerId === "deepseek") return parseDeepseek(data);
-  if (providerId === "agentrouter") return parseAgentrouter(data);
+  if (providerId === "agentrouter" || providerId === "kilocode") return parseAgentrouter(data);
   return parseGeneric(data);
 }
 

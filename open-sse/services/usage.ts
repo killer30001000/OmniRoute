@@ -73,6 +73,7 @@ import { getCommandCodeUsage } from "./usage/command-code.ts";
 import { getQwenTokenPlanUsage } from "./usage/qwen-token-plan.ts";
 import { getConolUsage } from "./conolUsage.ts";
 import { getAgentrouterUsage } from "./usage/agentrouter.ts";
+import { getKilocodeUsage } from "./usage/kilocode.ts";
 
 type JsonRecord = Record<string, unknown>;
 type UsageProviderConnection = JsonRecord & {
@@ -145,6 +146,7 @@ export const USAGE_FETCHER_PROVIDERS = [
   "cnl",
   // AgentRouter (New-API) console balance (GET /api/user/self)
   "agentrouter",
+  "kilocode",
 ] as const;
 
 export type UsageFetcherProvider = (typeof USAGE_FETCHER_PROVIDERS)[number];
@@ -256,6 +258,8 @@ export async function getUsageForProvider(
       return await getConolUsage(apiKey || accessToken, providerSpecificData);
     case "agentrouter":
       return await getAgentrouterUsage(id, connection);
+    case "kilocode":
+      return await getKilocodeUsage(id, connection);
     default:
       return { message: `Usage API not implemented for ${provider}` };
   }
@@ -295,4 +299,5 @@ export const __testing = {
   mapSubscriptionTierStringToPlanLabel,
   toDisplayLabel,
   getKiroUsage,
+  getKilocodeUsage,
 };
