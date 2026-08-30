@@ -38,6 +38,50 @@ function calculateDaysUntil(dateString: string | null | undefined): number | nul
   }
 }
 
+type KiloPassMeterValues = Pick<
+  KiloPassMeterProps,
+  "base" | "bonus" | "used" | "total" | "remaining"
+>;
+
+function nonNegativeNumber(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function percentage(value: number, total: number): number {
+  return total > 0 ? Math.min(100, (value / total) * 100) : 0;
+}
+
+export function buildKiloPassMeterModel({
+  base,
+  bonus,
+  used,
+  total,
+  remaining,
+}: KiloPassMeterValues) {
+  const paid = nonNegativeNumber(base);
+  const bonusAmount = nonNegativeNumber(bonus);
+  const usedAmount = nonNegativeNumber(used);
+  const totalAmount = nonNegativeNumber(total);
+  const remainingAmount = nonNegativeNumber(remaining);
+  const paidUsed = Math.min(usedAmount, paid);
+  const bonusUsed = Math.min(Math.max(usedAmount - paid, 0), bonusAmount);
+
+  return {
+    paid,
+    bonus: bonusAmount,
+    used: usedAmount,
+    total: totalAmount,
+    remaining: remainingAmount,
+    progressValue: Math.min(totalAmount, usedAmount),
+    paidPercent: percentage(paid, totalAmount),
+    bonusPercent: percentage(bonusAmount, totalAmount),
+    paidUsedPercent: percentage(paidUsed, paid),
+    bonusUsedPercent: percentage(bonusUsed, bonusAmount),
+    hasPaidSegment: paid > 0,
+    hasBonusSegment: bonusAmount > 0,
+  };
+}
+
 export default function KiloPassMeter({
   base,
   bonus,
@@ -50,31 +94,14 @@ export default function KiloPassMeter({
   const t = useTranslations("usage");
   const locale = useLocale();
 
-  const model = useMemo(() => {
-    const paid = Math.max(0, base);
-    const bonusAmount = Math.max(0, bonus);
-    const usedAmount = Math.max(0, used);
-    const totalAmount = Math.max(0, total);
-    const remainingAmount = Math.max(0, remaining);
+  const model = useMemo(
+    () => buildKiloPassMeterModel({ base, bonus, used, total, remaining }),
+    [base, bonus, used, total, remaining]
+  );
 
-    const boundary = totalAmount > 0 ? (paid / totalAmount) * 100 : 0;
-    const usedPercent = totalAmount > 0 ? Math.min(100, (usedAmount / totalAmount) * 100) : 0;
-
-    return {
-      paid: paid,
-      bonus: bonusAmount,
-      used: usedAmount,
-      total: totalAmount,
-      remaining: remainingAmount,
-      progressValue: Math.min(totalAmount, usedAmount),
-      boundary,
-      paidFill: Math.min(usedPercent, boundary),
-      bonusFill: Math.max(0, usedPercent - boundary),
-      usedPercent,
-    };
-  }, [base, bonus, used, total, remaining]);
-
-  const colors = getBarColor(100 - model.usedPercent);
+  const colors = getBarColor(
+    model.total > 0 ? 100 - (model.progressValue / model.total) * 100 : 100
+  );
   const daysUntilRenewal = calculateDaysUntil(nextBillingAt);
   const renewalDate = nextBillingAt
     ? new Date(nextBillingAt).toLocaleDateString(locale, {
@@ -96,68 +123,80 @@ export default function KiloPassMeter({
         </span>
       </div>
 
-      {/* Progress bar with paid/bonus segments */}
-      <div
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={model.total}
-        aria-valuenow={model.progressValue}
-        aria-valuetext={`${formatCurrency(model.used)} of ${formatCurrency(model.total)}`}
-        aria-label={translateUsageOrFallback(t, "kiloPassMeterLabel", "Kilo Pass usage meter")}
-        className="relative h-2 rounded-full overflow-hidden bg-black/[0.06] dark:bg-white/[0.06]"
-      >
-        {/* Paid segment background */}
+      <div className="flex flex-col gap-1.5">
         <div
-          className="absolute inset-y-0 left-0 bg-green-500/20"
-          style={{ width: `${model.boundary}%` }}
-          aria-hidden="true"
-        />
-        {/* Bonus segment background */}
-        {model.bonus > 0 && (
-          <div
-            className="absolute inset-y-0 bg-blue-500/20"
-            style={{ left: `${model.boundary}%`, width: `${100 - model.boundary}%` }}
-            aria-hidden="true"
-          />
-        )}
-        {/* Paid fill */}
-        <div
-          className="absolute inset-y-0 left-0 bg-green-500 transition-[width] duration-300 ease-out"
-          style={{ width: `${model.paidFill}%` }}
-          aria-hidden="true"
-        />
-        {/* Bonus fill */}
-        {model.bonusFill > 0 && (
-          <div
-            className="absolute inset-y-0 bg-blue-500 transition-[width] duration-300 ease-out"
-            style={{ left: `${model.boundary}%`, width: `${model.bonusFill}%` }}
-            aria-hidden="true"
-          />
-        )}
-        {/* Boundary marker */}
-        {model.bonus > 0 && (
-          <div
-            className="absolute inset-y-0 w-px bg-border"
-            style={{ left: `${model.boundary}%` }}
-            aria-hidden="true"
-          />
-        )}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={model.total}
+          aria-valuenow={model.progressValue}
+          aria-valuetext={`${formatCurrency(model.used)} of ${formatCurrency(model.total)}`}
+          aria-label={translateUsageOrFallback(t, "kiloPassMeterLabel", "Kilo Pass usage meter")}
+          className="flex h-3 min-w-0 overflow-hidden rounded-full bg-bg-subtle ring-1 ring-inset ring-border/60"
+        >
+          {model.hasPaidSegment && (
+            <div
+              data-kilo-pass-segment="paid"
+              data-kilo-pass-boundary={model.hasBonusSegment ? "true" : undefined}
+              className={`relative min-w-0 bg-emerald-500/15 ${
+                model.hasBonusSegment ? "border-r-2 border-text-muted" : ""
+              }`}
+              style={{ width: `${model.paidPercent}%` }}
+              aria-hidden="true"
+            >
+              <div
+                className="absolute inset-y-0 left-0 bg-emerald-500 transition-[width] duration-300 ease-out"
+                style={{ width: `${model.paidUsedPercent}%` }}
+              />
+            </div>
+          )}
+          {model.hasBonusSegment && (
+            <div
+              data-kilo-pass-segment="bonus"
+              className="relative min-w-0 bg-sky-500/15"
+              style={{ width: `${model.bonusPercent}%` }}
+              aria-hidden="true"
+            >
+              <div
+                className="absolute inset-y-0 left-0 bg-sky-500 transition-[width] duration-300 ease-out"
+                style={{ width: `${model.bonusUsedPercent}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-w-0 items-start text-[11px] text-text-main">
+          {model.hasPaidSegment && (
+            <div className="min-w-0" style={{ width: `${model.paidPercent}%` }}>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-4">
+                <span
+                  className="inline-block size-2 shrink-0 rounded-full bg-emerald-500"
+                  aria-hidden="true"
+                />
+                <span>{translateUsageOrFallback(t, "kiloPassPaid", "Paid")}</span>
+              </div>
+              <span className="block pt-0.5 font-semibold tabular-nums">
+                {formatCurrency(model.paid)}
+              </span>
+            </div>
+          )}
+          {model.hasBonusSegment && (
+            <div className="min-w-0" style={{ width: `${model.bonusPercent}%` }}>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-4">
+                <span
+                  className="inline-block size-2 shrink-0 rounded-full bg-sky-500"
+                  aria-hidden="true"
+                />
+                <span>{translateUsageOrFallback(t, "kiloPassBonus", "Available bonus")}</span>
+              </div>
+              <span className="block pt-0.5 font-semibold tabular-nums">
+                {formatCurrency(model.bonus)}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Amounts breakdown */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-main">
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block size-2 rounded-full bg-green-500" aria-hidden="true" />
-          <span>{translateUsageOrFallback(t, "kiloPassPaid", "Paid")}</span>
-          <span className="font-semibold tabular-nums">{formatCurrency(model.paid)}</span>
-        </div>
-        {model.bonus > 0 && (
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block size-2 rounded-full bg-blue-500" aria-hidden="true" />
-            <span>{translateUsageOrFallback(t, "kiloPassBonus", "Available bonus")}</span>
-            <span className="font-semibold tabular-nums">{formatCurrency(model.bonus)}</span>
-          </div>
-        )}
         <div className="flex items-center gap-1.5">
           <span
             className="material-symbols-outlined text-[13px] text-text-muted"
