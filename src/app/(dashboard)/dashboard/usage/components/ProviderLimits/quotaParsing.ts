@@ -307,6 +307,38 @@ function parseAgentrouter(data: any) {
   return quotaEntries(data).map(([quotaKey, quota]) => parseAgentrouterQuota(quotaKey, quota));
 }
 
+/**
+ * Kilo Code quota parser. Routes balance + Kilo Pass keys through credits-style
+ * rendering so the dashboard shows USD amounts instead bare percentages.
+ *
+ * Quota keys:
+ * - balance: personal USD balance (unlimited wallet)
+ * - kiloPassBase: Kilo Pass base credits for current period
+ * - kiloPassBonus: Kilo Pass bonus credits for current period
+ * - kiloPassUsage: Kilo Pass usage consumed in current period
+ * - kiloPassRemaining: remaining Kilo Pass credits (base + bonus - usage)
+ */
+function parseKilocodeQuota(quotaKey: string, quota: any) {
+  if (quotaKey === "balance" || quotaKey.startsWith("kiloPass")) {
+    const remaining = Math.max(0, Number(quota?.remaining ?? 0));
+    const currency = quota?.currency || "USD";
+    const remainingPercentage =
+      safePercentage(quota?.remainingPercentage) ?? (remaining > 0 ? 100 : 0);
+    return buildCreditsQuota(quotaKey, remaining, remainingPercentage, {
+      currency,
+      displayName: quota?.displayName,
+      resetAt: quota?.resetAt ?? null,
+      used: Number.isFinite(Number(quota?.used)) ? Number(quota?.used) : 0,
+      total: Number.isFinite(Number(quota?.total)) ? Number(quota?.total) : 0,
+    });
+  }
+  return normalizeQuotaEntry(quotaKey, quota);
+}
+
+function parseKilocode(data: any) {
+  return quotaEntries(data).map(([quotaKey, quota]) => parseKilocodeQuota(quotaKey, quota));
+}
+
 function parseProviderQuotas(providerId: string, data: any) {
   if (providerId === "github") return parseGithub(data);
   if (["glm", "glm-cn", "glmt", "opencode-go"].includes(providerId)) return parseGlmFamily(data);
@@ -314,7 +346,8 @@ function parseProviderQuotas(providerId: string, data: any) {
   if (providerId === "codex") return parseCodex(data);
   if (providerId === "claude") return parseClaude(data);
   if (providerId === "deepseek") return parseDeepseek(data);
-  if (providerId === "agentrouter" || providerId === "kilocode") return parseAgentrouter(data);
+  if (providerId === "kilocode") return parseKilocode(data);
+  if (providerId === "agentrouter") return parseAgentrouter(data);
   return parseGeneric(data);
 }
 

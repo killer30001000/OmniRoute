@@ -103,3 +103,128 @@ test("kilocode balance quota parses as USD credit row in the Dashboard parser", 
   assert.equal(row.creditCount, 12.34, "renderer displays q.creditCount as the dollar amount");
   assert.equal(row.remainingPercentage, 100, "funded wallet must not read as exhausted");
 });
+
+test("kilocode balance + Kilo Pass quotas parse five USD credit rows", async () => {
+  const balanceQuota = {
+    used: 0,
+    total: 0,
+    remaining: 11.51,
+    remainingPercentage: 100,
+    resetAt: null,
+    unlimited: true,
+    currency: "USD",
+    displayName: "Balance (USD)",
+  };
+  const baseQuota = {
+    used: 0,
+    total: 50,
+    remaining: 50,
+    remainingPercentage: 100,
+    resetAt: "2026-09-15T00:00:00.000Z",
+    unlimited: false,
+    currency: "USD",
+    displayName: "Base Credits",
+  };
+  const bonusQuota = {
+    used: 0,
+    total: 5,
+    remaining: 5,
+    remainingPercentage: 100,
+    resetAt: null,
+    unlimited: false,
+    currency: "USD",
+    displayName: "Bonus Credits",
+  };
+  const usageQuota = {
+    used: 30,
+    total: 55,
+    remaining: 25,
+    remainingPercentage: 45.45,
+    resetAt: "2026-09-15T00:00:00.000Z",
+    unlimited: false,
+    currency: "USD",
+    displayName: "Kilo Pass Usage",
+  };
+  const remainingQuota = {
+    used: 0,
+    total: 0,
+    remaining: 25,
+    remainingPercentage: 100,
+    resetAt: "2026-09-15T00:00:00.000Z",
+    unlimited: false,
+    currency: "USD",
+    displayName: "Pass Remaining",
+  };
+  const usage = {
+    plan: "Kilo Code",
+    quotas: {
+      balance: balanceQuota,
+      kiloPassBase: baseQuota,
+      kiloPassBonus: bonusQuota,
+      kiloPassUsage: usageQuota,
+      kiloPassRemaining: remainingQuota,
+    },
+  };
+  const rows = parseQuotaData("kilocode", usage) as Array<{
+    isCredits?: boolean;
+    currency?: string;
+    creditCount?: number;
+    displayName?: string;
+  }>;
+  assert.equal(rows.length, 5);
+  for (const row of rows) {
+    assert.equal(row.isCredits, true);
+    assert.equal(row.currency, "USD");
+  }
+  const byName = new Map(rows.map((r) => [r.displayName, r.creditCount]));
+  assert.equal(byName.get("Balance (USD)"), 11.51);
+  assert.equal(byName.get("Base Credits"), 50);
+  assert.equal(byName.get("Bonus Credits"), 5);
+  assert.equal(byName.get("Kilo Pass Usage"), 25);
+  assert.equal(byName.get("Pass Remaining"), 25);
+});
+
+test("getUsageForProvider returns Kilo Pass quotas through dispatcher", async () => {
+  const subscription = {
+    status: "active",
+    currentPeriodBaseCreditsUsd: 50,
+    currentPeriodUsageUsd: 30,
+    currentPeriodBonusCreditsUsd: 5,
+    nextBillingAt: "2026-09-15T00:00:00.000Z",
+  };
+  const json = { subscription };
+  const data = { json };
+  const result = { data };
+  const passPayload = [{ result }];
+
+  globalThis.fetch = (async (url: unknown) => {
+    const u = String(url);
+    if (u.includes("/api/profile/balance")) {
+      return new Response(JSON.stringify({ balance: 11.51 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify(passPayload), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  const usage = (await getUsageForProvider({
+    id: "conn-kilo-pass",
+    provider: "kilocode",
+    accessToken: "oauth-token-123",
+  })) as {
+    plan?: string;
+    quotas?: Record<string, { remaining?: number; used?: number }>;
+    message?: string;
+  };
+  assert.equal(usage.plan, "Kilo Code");
+  assert.equal(usage.message, undefined);
+  assert.ok(usage.quotas);
+  assert.equal(usage.quotas.balance.remaining, 11.51);
+  assert.equal(usage.quotas.kiloPassBase.remaining, 50);
+  assert.equal(usage.quotas.kiloPassUsage.used, 30);
+  assert.equal(usage.quotas.kiloPassRemaining.remaining, 25);
+});
