@@ -82,7 +82,9 @@ function passUsd(value: unknown): number {
  * Parse Kilo Pass state from the tRPC response, mirroring the official
  * Kilo-Org/kilocode parseKiloPassState semantics exactly:
  * - batched tRPC shape: [{ result: { data: { json: { subscription } } } }]
- * - plain fallback: { subscription } (or unwrapped data json)
+ * - unbatched result.data.json: { result: { data: { json: { subscription } } } }
+ * - plain result.data (no superjson json wrapper): { result: { data: { subscription } } }
+ * - plain fallback: { subscription }
  * - requires at least one period amount present (base or usage)
  * - status, when present as string, must be a live status
  * - negative/non-finite amounts clamp to 0; invalid dates become null
@@ -93,13 +95,16 @@ function passUsd(value: unknown): number {
 export function parseKiloPassState(value: unknown): KiloPassState | null {
   const item = Array.isArray(value) ? value[0] : value;
   const data = toRecord(toRecord(toRecord(item)?.result)?.data);
-  // Official fallback: when the tRPC result.data.json envelope is absent,
-  // treat the raw payload itself as the root object.
+  // Official Kilo-Org/kilocode fallback chain: data.json envelope first,
+  // then the tRPC data object itself (plain-JSON responses carry the
+  // subscription there without a superjson json wrapper), then raw payload.
   const jsonValue = data?.json;
   const root =
     jsonValue !== null && typeof jsonValue === "object" && !Array.isArray(jsonValue)
       ? toRecord(jsonValue)
-      : toRecord(value);
+      : Object.keys(data).length > 0
+        ? data
+        : toRecord(value);
   const sub = toRecord(root?.subscription);
 
   if (!sub || (sub.currentPeriodBaseCreditsUsd == null && sub.currentPeriodUsageUsd == null)) {
