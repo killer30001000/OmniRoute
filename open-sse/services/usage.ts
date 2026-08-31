@@ -88,10 +88,13 @@ type UsageProviderConnection = JsonRecord & {
 
 /**
  * Single source of truth for which providers have a `getUsageForProvider`
- * implementation. Consumers like `genericQuotaFetcher.ts` reference this so
- * the registration list can't drift from the switch statement below.
+ * implementation — consumers like `genericQuotaFetcher.ts` reference it so the
+ * registration list can't drift from the switch statement below.
  *
- * If you add a new provider to the switch, add it here too.
+ * If you add a new provider to the switch, add it to the list too. The list now lives in
+ * `./usage/fetcherProviders.ts` (a zero-dependency leaf) so that consumers which only need
+ * to know *whether* a fetcher exists — the provider-plugin manifest — can read it without
+ * importing this dispatcher. Re-exported here so this stays the public import path.
  */
 export { USAGE_FETCHER_PROVIDERS } from "./usage/fetcherProviders.ts";
 export type { UsageFetcherProvider } from "./usage/fetcherProviders.ts";

@@ -975,13 +975,13 @@ Reverse-engineered session bridge for hyperagent.com (`src/shared/constants/prov
 
 ---
 
-## Kilo Code Balance Quota
+## Kilo Code Usage Quotas
 
-Personal USD balance lookup for the Kilo Code provider. Optional — the default points at the public Kilo API; override only for a relay/test fixture. Authentication uses the connection's existing OAuth access token.
+Personal USD balance and Kilo Pass usage lookup for the Kilo Code provider. Optional — the default points at the public Kilo API; override only for a relay/test fixture. Authentication uses the connection's existing OAuth access token.
 
 | Variable        | Default                | Source File                             | Description                                             |
 | ---------------- | ---------------------- | ----------------------------------------- | ------------------------------------------------------- |
-| `KILO_API_URL`   | `https://api.kilo.ai`  | `open-sse/services/usage/kilocode.ts`   | Base URL used to fetch the personal Kilo Code balance quota. |
+| `KILO_API_URL`   | `https://api.kilo.ai`  | `open-sse/services/usage/kilocode.ts`   | Base URL used to fetch personal Kilo Code balance and Kilo Pass usage. |
 
 ---
 
