@@ -27,12 +27,82 @@ import {
   setPurchasedTier,
 } from "../../open-sse/services/openrouterFreeWindow.ts";
 import { getProviderErrorRuleMatch } from "../../open-sse/config/providerErrorRules.ts";
+import { getUsageForProvider, USAGE_FETCHER_PROVIDERS } from "../../open-sse/services/usage.ts";
+import { isSupportedUsageConnection } from "../../src/lib/usage/providerLimits.ts";
+import { USAGE_SUPPORTED_PROVIDERS } from "../../src/shared/constants/providers.ts";
 
 const originalFetch = globalThis.fetch;
 
 test.afterEach(() => {
   globalThis.fetch = originalFetch;
   clearFreeWindowState();
+});
+
+// ─── 0. Provider Limits gates ─────────────────────────────────────────────
+
+test("OpenRouter is registered for usage fetching and Provider Limits", () => {
+  assert.ok((USAGE_FETCHER_PROVIDERS as readonly string[]).includes("openrouter"));
+  assert.ok((USAGE_SUPPORTED_PROVIDERS as readonly string[]).includes("openrouter"));
+});
+
+test("OpenRouter apikey connections are supported by Provider Limits", () => {
+  assert.equal(
+    isSupportedUsageConnection({
+      id: "openrouter-apikey",
+      provider: "openrouter",
+      authType: "apikey",
+    }),
+    true
+  );
+});
+
+test("OpenRouter api_key alias connections are supported by Provider Limits", () => {
+  assert.equal(
+    isSupportedUsageConnection({
+      id: "openrouter-api-key",
+      provider: "openrouter",
+      authType: "api_key",
+    }),
+    true
+  );
+});
+
+test("unsupported OpenRouter auth types remain rejected", () => {
+  assert.equal(
+    isSupportedUsageConnection({
+      id: "openrouter-unsupported-auth",
+      provider: "openrouter",
+      authType: "session",
+    }),
+    false
+  );
+});
+
+test("getUsageForProvider retains the OpenRouter usage dispatcher", async () => {
+  globalThis.fetch = async (url) => {
+    if (String(url).endsWith("/key")) {
+      return new Response(
+        JSON.stringify({
+          data: { limit: 10, limit_remaining: 4, limit_reset: null, is_free_tier: false },
+        }),
+        { status: 200 }
+      );
+    }
+    return new Response(JSON.stringify({ data: { total_credits: 10, total_usage: 6 } }), {
+      status: 200,
+    });
+  };
+
+  const result = await getUsageForProvider({
+    id: "openrouter-dispatch",
+    provider: "openrouter",
+    apiKey: "synthetic-openrouter-key",
+  });
+  assert.equal(
+    (result as { quotas?: Record<string, unknown> }).quotas?.credits !== undefined,
+    true
+  );
+  invalidateOpenrouterQuotaCache("openrouter-dispatch");
 });
 
 // ─── 1. Endpoint parsing ──────────────────────────────────────────────────
