@@ -565,7 +565,9 @@ function stampServiceWorkerBuildId(resolvedOutDir) {
   const swDest = path.join(resolvedOutDir, "public", "sw.js");
   if (!fsSync.existsSync(swDest)) return;
   const buildId =
-    process.env.OMNIROUTE_SW_BUILD_ID || process.env.SOURCE_VERSION || String(Date.now());
+    process.env.OMNIROUTE_SW_BUILD_ID ||
+    process.env.SOURCE_VERSION ||
+    String(Date.now());
   let sw = fsSync.readFileSync(swDest, "utf8");
   sw = sw.replace(
     /^const CACHE_NAME = "omniroute-pwa-v2";$/m,
