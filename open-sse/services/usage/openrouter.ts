@@ -10,15 +10,67 @@ import { fetchOpenrouterQuota, type OpenrouterQuota } from "../openrouterQuotaFe
 import { getFreeWindowStatus, resolveAccountKey } from "../openrouterFreeWindow.ts";
 import { type UsageQuota } from "./quota.ts";
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function finiteOrNull(value: number | null): number | null {
+  return value !== null && Number.isFinite(value) ? value : null;
+}
+
 function buildCreditsQuota(quota: OpenrouterQuota): UsageQuota | null {
-  if (quota.limit === null && quota.creditBalance === null) return null;
+  const keyLimit = finiteOrNull(quota.limit);
+  const accountTotal = finiteOrNull(quota.totalCredits);
+  const accountUsage = finiteOrNull(quota.totalUsage);
+  const creditBalance = finiteOrNull(quota.creditBalance);
+
+  if (keyLimit !== null) {
+    const total = Math.max(0, keyLimit);
+    const keyRemaining = finiteOrNull(quota.limitRemaining);
+    if (keyRemaining === null) {
+      return {
+        used: 0,
+        total,
+        resetAt: quota.resetAt ?? null,
+        unlimited: false,
+        currency: "USD",
+      };
+    }
+
+    const remaining = clamp(keyRemaining, 0, total);
+    return {
+      used: total - remaining,
+      total,
+      remaining,
+      ...(total > 0 ? { remainingPercentage: Math.round((remaining / total) * 100) } : {}),
+      resetAt: quota.resetAt ?? null,
+      unlimited: false,
+      currency: "USD",
+    };
+  }
+
+  if (accountTotal !== null && accountTotal > 0 && accountUsage !== null) {
+    const total = accountTotal;
+    const used = clamp(accountUsage, 0, total);
+    const remaining = clamp(creditBalance ?? total - used, 0, total);
+    return {
+      used,
+      total,
+      remaining,
+      remainingPercentage: Math.round((remaining / total) * 100),
+      resetAt: quota.resetAt ?? null,
+      unlimited: false,
+      currency: "USD",
+    };
+  }
+
+  if (creditBalance === null) return null;
   return {
-    used: quota.limit !== null ? quota.limit - (quota.limitRemaining ?? quota.limit) : 0,
-    total: quota.limit ?? 0,
-    remaining: quota.creditBalance ?? undefined,
-    remainingPercentage: quota.limit !== null ? Math.round((1 - quota.percentUsed) * 100) : 100,
+    used: 0,
+    total: 0,
+    remaining: Math.max(0, creditBalance),
     resetAt: quota.resetAt ?? null,
-    unlimited: quota.limit === null,
+    unlimited: false,
     currency: "USD",
   };
 }

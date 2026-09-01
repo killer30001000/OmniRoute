@@ -105,6 +105,145 @@ test("getUsageForProvider retains the OpenRouter usage dispatcher", async () => 
   invalidateOpenrouterQuotaCache("openrouter-dispatch");
 });
 
+type OpenrouterCreditsQuota = {
+  used: number;
+  total: number;
+  remaining?: number;
+  remainingPercentage?: number;
+  unlimited: boolean;
+};
+
+async function getOpenrouterCreditsQuota(
+  connectionId: string,
+  key: { limit: number | null; limitRemaining: number | null },
+  credits: { totalCredits: number | null; totalUsage: number | null }
+): Promise<OpenrouterCreditsQuota> {
+  globalThis.fetch = async (url) => {
+    if (String(url).endsWith("/key")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            limit: key.limit,
+            limit_remaining: key.limitRemaining,
+            limit_reset: null,
+            is_free_tier: false,
+          },
+        }),
+        { status: 200 }
+      );
+    }
+    return new Response(
+      JSON.stringify({
+        data: {
+          total_credits: credits.totalCredits,
+          total_usage: credits.totalUsage,
+        },
+      }),
+      { status: 200 }
+    );
+  };
+
+  const result = await getUsageForProvider({
+    id: connectionId,
+    provider: "openrouter",
+    apiKey: "synthetic-openrouter-key",
+  });
+  invalidateOpenrouterQuotaCache(connectionId);
+
+  const quota = (result as { quotas?: Record<string, OpenrouterCreditsQuota> }).quotas?.credits;
+  assert.ok(quota);
+  return quota;
+}
+
+test("OpenRouter credits use an explicit key limit when present", async () => {
+  const quota = await getOpenrouterCreditsQuota(
+    "openrouter-key-limit",
+    { limit: 10, limitRemaining: 9.3 },
+    { totalCredits: 10, totalUsage: 0.7 }
+  );
+
+  assert.equal(quota.total, 10);
+  assert.ok(Math.abs(quota.used - 0.7) < 0.000_001);
+  assert.equal(quota.remaining, 9.3);
+  assert.equal(quota.remainingPercentage, 93);
+  assert.equal(quota.unlimited, false);
+});
+
+test("OpenRouter PAYG credits use account balance without a key limit", async () => {
+  const quota = await getOpenrouterCreditsQuota(
+    "openrouter-payg",
+    { limit: null, limitRemaining: null },
+    { totalCredits: 10, totalUsage: 0.7 }
+  );
+
+  assert.equal(quota.total, 10);
+  assert.equal(quota.used, 0.7);
+  assert.equal(quota.remaining, 9.3);
+  assert.equal(quota.remainingPercentage, 93);
+  assert.equal(quota.unlimited, false);
+});
+
+test("OpenRouter PAYG credits report a low account balance", async () => {
+  const quota = await getOpenrouterCreditsQuota(
+    "openrouter-payg-low",
+    { limit: null, limitRemaining: null },
+    { totalCredits: 10, totalUsage: 9.5 }
+  );
+
+  assert.equal(quota.remaining, 0.5);
+  assert.equal(quota.remainingPercentage, 5);
+});
+
+test("OpenRouter PAYG credits report an exhausted account balance", async () => {
+  const quota = await getOpenrouterCreditsQuota(
+    "openrouter-payg-exhausted",
+    { limit: null, limitRemaining: null },
+    { totalCredits: 10, totalUsage: 10 }
+  );
+
+  assert.equal(quota.remaining, 0);
+  assert.equal(quota.remainingPercentage, 0);
+});
+
+test("OpenRouter credits clamp inconsistent account values to a valid percentage", async () => {
+  const quota = await getOpenrouterCreditsQuota(
+    "openrouter-payg-clamp",
+    { limit: null, limitRemaining: null },
+    { totalCredits: 10, totalUsage: 15 }
+  );
+
+  assert.ok((quota.remainingPercentage ?? -1) >= 0);
+  assert.ok((quota.remainingPercentage ?? 101) <= 100);
+});
+
+test("OpenRouter key limits take priority over the account credit pool", async () => {
+  const quota = await getOpenrouterCreditsQuota(
+    "openrouter-key-priority",
+    { limit: 10, limitRemaining: 4 },
+    { totalCredits: 100, totalUsage: 20 }
+  );
+
+  assert.equal(quota.total, 10);
+  assert.equal(quota.used, 6);
+  assert.equal(quota.remaining, 4);
+  assert.equal(quota.remainingPercentage, 40);
+  assert.equal(quota.unlimited, false);
+});
+
+test("OpenRouter balance without a usable total does not invent a 100 percent budget", async () => {
+  const quota = await getOpenrouterCreditsQuota(
+    "openrouter-balance-only",
+    { limit: null, limitRemaining: null },
+    { totalCredits: 0, totalUsage: -5 }
+  );
+
+  assert.equal(quota.total, 0);
+  assert.equal(quota.used, 0);
+  assert.equal(quota.remaining, 5);
+  assert.equal(quota.remainingPercentage, undefined);
+  assert.equal(quota.unlimited, false);
+});
+
 // ─── 1. Endpoint parsing ──────────────────────────────────────────────────
 
 test("parseOpenrouterKeyResponse parses a full /api/v1/key response", () => {
