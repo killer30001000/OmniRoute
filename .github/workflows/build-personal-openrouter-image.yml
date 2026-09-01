@@ -3,7 +3,7 @@ name: Build Personal OpenRouter Image
 on:
   push:
     branches:
-      - personal/openrouter-usage
+      - personal/openrouter-usage-next
   workflow_dispatch:
 
 concurrency:
