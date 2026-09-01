@@ -137,6 +137,14 @@ const EXTRA_MODULE_ENTRIES = [
     dest: ["node_modules", "pino-pretty"],
   },
   { label: "split2", src: ["node_modules", "split2"], dest: ["node_modules", "split2"] },
+  {
+    // tiktoken's Node entrypoint synchronously reads tiktoken_bg.wasm relative
+    // to __dirname. Keeping the package external preserves that lookup, but
+    // Next's file trace does not retain the dynamically-read sibling asset.
+    label: "tiktoken WASM runtime",
+    src: ["node_modules", "tiktoken"],
+    dest: ["node_modules", "tiktoken"],
+  },
   { label: "migrations", src: ["src", "lib", "db", "migrations"], dest: ["migrations"] },
   { label: "MITM server", src: ["src", "mitm", "server.cjs"], dest: ["src", "mitm", "server.cjs"] },
   {
@@ -557,9 +565,7 @@ function stampServiceWorkerBuildId(resolvedOutDir) {
   const swDest = path.join(resolvedOutDir, "public", "sw.js");
   if (!fsSync.existsSync(swDest)) return;
   const buildId =
-    process.env.OMNIROUTE_SW_BUILD_ID ||
-    process.env.SOURCE_VERSION ||
-    String(Date.now());
+    process.env.OMNIROUTE_SW_BUILD_ID || process.env.SOURCE_VERSION || String(Date.now());
   let sw = fsSync.readFileSync(swDest, "utf8");
   sw = sw.replace(
     /^const CACHE_NAME = "omniroute-pwa-v2";$/m,

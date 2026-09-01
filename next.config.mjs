@@ -339,6 +339,10 @@ const nextConfig = {
     "tough-cookie",
     "@ngrok/ngrok",
     "@huggingface/transformers",
+    // tiktoken's Node entrypoint reads tiktoken_bg.wasm from __dirname. Bundle
+    // the package through the standalone assembler so that runtime lookup keeps
+    // the package-relative path instead of a Next server chunk path.
+    "tiktoken",
     // copilot-m365-web.ts imports 'ws' as a client-side WebSocket. When bundled,
     // ws cannot resolve its 'bufferutil' native addon (frame masking) and throws
     // TypeError: b.mask is not a function on the first outgoing frame, causing
