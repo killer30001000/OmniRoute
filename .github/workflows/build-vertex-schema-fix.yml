@@ -1,0 +1,66 @@
+# Fork-only CI: build the current upstream release plus the Vertex schema fix
+# and publish it only to this fork's GitHub Container Registry.
+name: Build Vertex Schema Fix Image
+
+on:
+  push:
+    branches:
+      - build/vertex-schema-fix-release
+  workflow_dispatch:
+
+concurrency:
+  group: build-vertex-schema-fix-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Build and publish Vertex schema fix image (linux/amd64)
+    runs-on: ubuntu-latest
+    if: github.repository == 'killer30001000/OmniRoute'
+    env:
+      IMAGE_NAME: ghcr.io/killer30001000/omniroute
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=vertex-schema-fix
+            type=raw,value=vertex-schema-fix-release
+            type=sha,prefix=sha-,format=short
+          flavor: |
+            latest=false
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runner-base
+          platforms: linux/amd64
+          build-args: |
+            OMNIROUTE_USE_TURBOPACK=0
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
