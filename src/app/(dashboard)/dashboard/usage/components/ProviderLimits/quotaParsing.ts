@@ -322,11 +322,26 @@ function parseAgentrouter(data: any) {
 // USD. Free-tier request windows keep the generic percentage treatment.
 function parseOpenrouterQuota(quotaKey: string, quota: any) {
   if (quotaKey !== "credits") return normalizeQuotaEntry(quotaKey, quota);
+
+  // OpenRouter backend (PRs #12256 + #12468) reports a positive denominator
+  // for PAYG accounts (`used`, `total`, `remaining`, `remainingPercentage`)
+  // and a balance-only payload for legacy keys. Route through the normal
+  // quota renderer when `total` is a finite positive number so the bar +
+  // `used / total` row show; otherwise fall back to the dedicated
+  // credit-balance row that QuotaCardExpanded renders as `$2.67`.
+  const total = Number(quota?.total ?? 0);
+  const hasPositiveDenominator = Number.isFinite(total) && total > 0;
+  if (hasPositiveDenominator) {
+    return normalizeQuotaEntry(quotaKey, quota, {
+      currency: quota?.currency || "USD",
+    });
+  }
   const remaining = Math.max(0, Number(quota?.remaining ?? 0));
-  const currency = quota?.currency || "USD";
   const remainingPercentage =
     safePercentage(quota?.remainingPercentage) ?? (remaining > 0 ? 100 : 0);
-  return buildCreditsQuota("credits", remaining, remainingPercentage, { currency });
+  return buildCreditsQuota("credits", remaining, remainingPercentage, {
+    currency: quota?.currency || "USD",
+  });
 }
 
 function parseOpenrouter(data: any) {
