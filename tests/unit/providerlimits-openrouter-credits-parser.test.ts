@@ -36,7 +36,7 @@ test("parseOpenrouter renders PAYG account credit row with bar + currency", () =
   assert.ok(Math.abs(row.used - 0.7) < 1e-6);
   assert.ok(Math.abs(row.remaining - 9.3) < 1e-6);
   assert.equal(row.remainingPercentage, 93);
-  assert.notEqual(row.isCredits, true, "PAYG row uses normal renderer");
+  assert.equal(row.isCredits, true, "PAYG row uses credits renderer");
 });
 
 test("parseOpenrouter keeps credit-balance row when no positive denominator", () => {
