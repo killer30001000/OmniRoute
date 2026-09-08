@@ -13,9 +13,9 @@ const GLM_FAMILY_PROVIDERS = ["glm", "glm-cn", "glmt", "opencode-go"];
 const KIMI_CODING_PROVIDERS = ["kimi-coding", "kimi-coding-apikey"];
 
 /**
- * Providers whose quotas get a deterministic fixed-window order below
- * (Codex, GLM family, Kimi Coding). Display layers (e.g. QuotaCardExpanded)
- * must not re-sort by remaining percentage, undoing the order (#6687).
+ * Providers whose quotas already get a deterministic fixed-window order below
+ * (Codex, GLM family, and Kimi Coding). Display layers (e.g. QuotaCardExpanded)
+ * must not re-sort these by remaining percentage, or they undo this order (#6687).
  */
 export function hasFixedQuotaOrder(providerId: string | undefined): boolean {
   const id = String(providerId || "").toLowerCase();
@@ -23,10 +23,10 @@ export function hasFixedQuotaOrder(providerId: string | undefined): boolean {
 }
 
 /**
- * Canonical chronological rank of a rolling usage window, derived from
- * the quota key itself rather than from a provider list.
+ * Canonical chronological rank of a rolling usage window, derived from the
+ * quota key itself rather than from a provider list.
  *
- * Providers name the same two windows in mutually incompatible ways — e.g.
+ * Providers name the same two windows in mutually incompatible ways —
  * `"session (5h)"` (claude, minimax, kimi), `"5 Hours Quota"` (GLM/zai),
  * `"five_hour"` (command-code, qwen-token-plan), `"code_5h"` (kimi-coding),
  * plain `"session"` (codex) — so matching on the shape of the key is the only
@@ -53,9 +53,9 @@ export function quotaWindowRank(name: unknown): number | null {
  * survive rendering.
  *
  * This is the structural counterpart to the provider whitelist above. The
- * whitelist exists because a few providers order windows whose rank we cannot
+ * whitelist exists because a few providers need an order the window rank cannot
  * express (Codex interleaves GPT-5.3-Codex-Spark windows and a banked-credit
- * row between canonical ones), but it went stale the moment any other
+ * row between the canonical ones), but it went stale the moment any other
  * provider started reporting session+weekly — claude, minimax, zai and
  * command-code all do. Deriving the answer from the data means the next such
  * provider is covered on arrival.
@@ -101,11 +101,7 @@ function isUnlimitedEmpty(quota: any): boolean {
 function isPastResetWindow(resetAt: any): boolean {
   if (!resetAt) return false;
   const resetTime =
-    typeof resetAt === "number"
-      ? resetAt
-      : typeof resetAt === "string"
-        ? Date.parse(resetAt)
-        : NaN;
+    typeof resetAt === "number" ? resetAt : typeof resetAt === "string" ? Date.parse(resetAt) : NaN;
   return Number.isFinite(resetTime) && Date.now() >= resetTime;
 }
 
@@ -133,7 +129,7 @@ function normalizeQuotaEntry(name: string, quota: any = {}, extras: any = {}) {
     used: Number.isFinite(adjusted.used) ? adjusted.used : 0,
     total: adjusted.total,
     ...(Number.isFinite(remaining) ? { remaining } : {}),
-    resetAt: quota?.resetAt ?? null,
+    resetAt: quota?.resetAt || null,
     staleAfterReset: adjusted.staleAfterReset,
     ...(adjusted.remainingPercentage !== undefined
       ? { remainingPercentage: adjusted.remainingPercentage }
@@ -297,44 +293,39 @@ function parseDeepseek(data: any) {
 
 // #10078 follow-up: AgentRouter's `quotas.balance` entry (open-sse/services/usage/agentrouter.ts)
 // carries a real USD amount in `remaining` + `currency: "USD"`. The generic path
-// (normalizeQuotaEntry via parseGeneric) drops `currency` and sets `isCredits`
-// with `creditCount` so the row is rendered as a meaningless "100% left"
-// instead of a dollar balance. Route through buildCreditsQuota() (same shape
-// DeepSeek/AgentRouter credits rows use) so the credit count renders as
-// USD. Free-tier request windows keep generic percentage treatment.
-//
-// #12468 follow-up: when the OpenRouter backend (PRs #12256 + #12468) reports a
-// positive denominator for PAYG accounts (`used`, `total`, `remaining`,
-// `remainingPercentage`), route through the normal quota renderer so the bar
-// + `used / total` row show; otherwise fall back to the dedicated
-// credit-balance row that QuotaCardExpanded renders as `$2.67`.
+// (normalizeQuotaEntry via parseGeneric) drops `currency` entirely and never sets
+// `isCredits`/`creditCount`, so QuotaCardExpanded's dollar-formatted
+// renderer (which only activates on `q.isCredits`) never triggers — the balance was
+// rendered as a bare "100%/0% left" percentage instead of "$X.XX". Route it through
+// buildCreditsQuota() (same shape DeepSeek/Claude-extra-usage credits rows use) so the
+// dollar figure — and an exhausted ($0.00) balance — render unambiguously as USD.
+function parseAgentrouterQuota(quotaKey: string, quota: any) {
+  if (quotaKey !== "balance") return normalizeQuotaEntry(quotaKey, quota);
+  const remaining = Math.max(0, Number(quota?.remaining ?? 0));
+  const currency = quota?.currency || "USD";
+  const remainingPercentage =
+    safePercentage(quota?.remainingPercentage) ?? (remaining > 0 ? 100 : 0);
+  return buildCreditsQuota(currency, remaining, remainingPercentage, { currency });
+}
+
 function parseAgentrouter(data: any) {
   return quotaEntries(data).map(([quotaKey, quota]) => parseAgentrouterQuota(quotaKey, quota));
 }
 
-function parseAgentrouterQuota(quotaKey: string, quota: any) {
-  if (quotaKey !== "balance") return normalizeQuotaEntry(quotaKey, quota);
-  const remaining = Math.max(0, Number(quota?.remaining ?? 0));
-  const remainingPercentage = safePercentage(quota?.remainingPercentage) ?? (remaining > 0 ? 100 : 0);
-  return buildCreditsQuota("balance", remaining, remainingPercentage, {
-    currency: quota?.currency || "USD",
-  });
-}
-
 // OpenRouter is credit-based, not subscription-based: the `credits` quota entry
-// (open-sse/services/usage/openrouter.ts) carries an account balance with
-// `remaining` + `currency: "USD"`, no `total`. The generic path
-// (normalizeQuotaEntry via parseGeneric) drops `currency` and sets
-// `isCredits`/`creditCount`, so the row is rendered as a meaningless "100% left"
-// instead of a dollar balance. Route through buildCreditsQuota() (same shape
-// DeepSeek/AgentRouter credits rows use) so the credit count renders as
-// USD. Free-tier request windows keep generic percentage treatment.
+// (open-sse/services/usage/openrouter.ts) carries the account balance in
+// `remaining` + `currency: "USD"` with `unlimited: true` / total 0. The generic
+// path (normalizeQuotaEntry via parseGeneric) drops `currency` and never sets
+// `isCredits`/`creditCount`, so the row rendered as a meaningless "100% left"
+// instead of the dollar balance. Route it through buildCreditsQuota() (same
+// shape DeepSeek/AgentRouter credits rows use) so the credit count renders as
+// USD. Free-tier request windows keep the generic percentage treatment.
 function parseOpenrouterQuota(quotaKey: string, quota: any) {
   if (quotaKey !== "credits") return normalizeQuotaEntry(quotaKey, quota);
 
   // OpenRouter backend (PRs #12256 + #12468) reports a positive denominator
   // for PAYG accounts (`used`, `total`, `remaining`, `remainingPercentage`)
-  // and a balance-only payload on legacy keys. Route through the normal
+  // and a balance-only payload for legacy keys. Route through the normal
   // quota renderer when `total` is a finite positive number so the bar +
   // `used / total` row show; otherwise fall back to the dedicated
   // credit-balance row that QuotaCardExpanded renders as `$2.67`.
@@ -345,7 +336,6 @@ function parseOpenrouterQuota(quotaKey: string, quota: any) {
       currency: quota?.currency || "USD",
     });
   }
-
   const remaining = Math.max(0, Number(quota?.remaining ?? 0));
   const remainingPercentage =
     safePercentage(quota?.remainingPercentage) ?? (remaining > 0 ? 100 : 0);
@@ -359,10 +349,10 @@ function parseOpenrouter(data: any) {
 }
 
 /**
- * Kilo Code quota parser. The personal balance keeps the credits-style USD row; the four raw Kilo Pass
+ * Kilo Code quota parser. Personal balance keeps the credits-style USD row; the four raw Kilo Pass
  * quota keys (kiloPassBase/kiloPassBonus/kiloPassUsage/kiloPassRemaining) are collapsed into one
  * display row that carries the real meter semantics: used = currentPeriodUsageUsd, total = base +
- * bonus, remaining = max(0, total - used). The collapsed row feeds a dedicated KiloPassMeter
+ * bonus, remaining = max(0, total - used). The collapsed row feeds the dedicated KiloPassMeter
  * component; the raw technical keys must never surface as individual rows because the generic
  * credits renderer would display creditCount (= remaining) for the usage entry, making "Usage"
  * read identical to "Remaining".
