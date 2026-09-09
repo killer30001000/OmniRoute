@@ -57,6 +57,10 @@ import { assignEditApiKeyProviderSpecificData } from "./connectionProviderSpecif
 import { isM365TierCapableProvider, normalizeM365TierValue, type M365TierValue } from "./m365Tier";
 import ProviderTierField from "./ProviderTierField";
 import AgentrouterConsoleFields from "./AgentrouterConsoleFields";
+import VertexGcpCreditFields, {
+  getVertexGcpCreditInitialState,
+  assignVertexGcpCreditToProviderSpecificData,
+} from "./VertexGcpCreditFields";
 import QuotaScrapingFields, { EMPTY_QUOTA_SCRAPING_FIELDS } from "./QuotaScrapingFields";
 import GlmTeamQuotaFields, { EMPTY_GLM_TEAM_QUOTA_FIELDS } from "./GlmTeamQuotaFields";
 import ProviderRegionField, { getProviderRegionConfig } from "./AlibabaProviderRegionField";
@@ -165,6 +169,7 @@ export default function EditConnectionModal({
       CHATGPT_WEB_CODEX_CONNECTOR_NAME,
     m365Tier: normalizeM365TierValue(connectionProviderSpecificData?.tier) as M365TierValue,
     peakHourProtection: { ...EMPTY_PEAK_HOUR_PROTECTION, windows: [] } as PeakHourProtectionConfig,
+    ...getVertexGcpCreditInitialState(connectionProviderSpecificData),
   });
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
@@ -546,6 +551,32 @@ export default function EditConnectionModal({
   const handleSubmit = async () => {
     setSaving(true);
     setSaveError(null);
+
+    if (isVertex && (formData as any).gcpCreditEnabled && (formData as any).gcpCreditAutoEnabled) {
+      const data = formData as any;
+      if (!data.gcpCreditQueryProjectId || !data.gcpCreditDatasetId || !data.gcpCreditTableId) {
+        setSaveError(
+          "Google Cloud Credit Auto Refresh requires Query Project, Dataset, and Table ID."
+        );
+        setSaving(false);
+        return;
+      }
+      if (!data.gcpCreditBaselineRemaining || !data.gcpCreditBaselineAsOf) {
+        setSaveError(
+          "Google Cloud Credit Auto Refresh requires Baseline Remaining and Baseline Timestamp."
+        );
+        setSaving(false);
+        return;
+      }
+      if (!data.gcpCreditCreditId && !data.gcpCreditCreditNameContains) {
+        setSaveError(
+          "Google Cloud Credit Auto Refresh requires either Promotion credit ID or Credit name contains."
+        );
+        setSaving(false);
+        return;
+      }
+    }
+
     try {
       const trimmedMaxConcurrent = formData.maxConcurrent.trim();
       const trimmedCloudCodeProjectId = formData.cloudCodeProjectId.trim();
@@ -740,6 +771,12 @@ export default function EditConnectionModal({
         // choice and switching back to the default would never take effect.
         if (showProtocolSelector) {
           updates.providerSpecificData.targetFormat = formData.targetFormat || null;
+        }
+        if (isVertex) {
+          assignVertexGcpCreditToProviderSpecificData(
+            updates.providerSpecificData,
+            formData as any
+          );
         }
       }
       if (isResponsesConnection && updates.providerSpecificData) {
@@ -1591,6 +1628,16 @@ export default function EditConnectionModal({
                 {t("totalKeysRotating", { count: extraApiKeys.length + 1 })}
               </p>
             )}
+          </div>
+        )}
+
+        {isVertex && (
+          <div className="flex flex-col gap-3">
+            <VertexGcpCreditFields
+              values={formData as any}
+              onChange={(patch) => setFormData({ ...formData, ...patch })}
+              t={t}
+            />
           </div>
         )}
 
