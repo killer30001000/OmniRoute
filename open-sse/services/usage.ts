@@ -141,7 +141,7 @@ export async function getUsageForProvider(
       return await getKiroUsage(accessToken, providerSpecificData);
     case "vertex":
     case "vertex-partner":
-      return await getVertexUsage(id || "", provider);
+      return await getVertexUsage(id || "", provider, providerSpecificData);
     case "kimi-coding":
     case "kimi-coding-apikey":
       return await getKimiUsage(accessToken, apiKey, providerSpecificData);

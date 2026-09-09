@@ -146,6 +146,29 @@ function normalizeQuotaEntry(name: string, quota: any = {}, extras: any = {}) {
   };
 }
 
+function parseVertexQuota(quotaKey: string, quota: any) {
+  if (quotaKey === "google_cloud_credit") {
+    const total = Number(quota?.total ?? 0);
+    if (Number.isFinite(total) && total > 0) {
+      return normalizeQuotaEntry(quotaKey, quota, {
+        currency: quota?.currency || "USD",
+      });
+    }
+    const remaining = Number(quota?.remaining ?? 0);
+    const remainingPercentage =
+      safePercentage(quota?.remainingPercentage) ?? (remaining > 0 ? 100 : 0);
+    return buildCreditsQuota("google_cloud_credit", remaining, remainingPercentage, {
+      currency: quota?.currency || "USD",
+      displayName: quota?.displayName,
+    });
+  }
+  return normalizeQuotaEntry(quotaKey, quota);
+}
+
+function parseVertex(data: any) {
+  return quotaEntries(data).map(([quotaKey, quota]) => parseVertexQuota(quotaKey, quota));
+}
+
 function parseGeneric(data: any) {
   const quotas = quotaEntries(data).map(([name, quota]) => normalizeQuotaEntry(name, quota));
   const bankedResetCredits = Number(data?.bankedResetCredits);
@@ -487,6 +510,7 @@ function parseProviderQuotas(providerId: string, data: any) {
   if (providerId === "kilocode") return parseKilocode(data);
   if (providerId === "agentrouter") return parseAgentrouter(data);
   if (providerId === "openrouter") return parseOpenrouter(data);
+  if (providerId === "vertex" || providerId === "vertex-partner") return parseVertex(data);
   return parseGeneric(data);
 }
 
