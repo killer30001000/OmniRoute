@@ -23,12 +23,14 @@ import { parseResetTime, type UsageQuota } from "./quota.ts";
  * or non-positive denominators render a USD-only row.
  */
 
+import { fetchBigQueryCreditDelta, type GcpCreditAutoConfig } from "./vertexGcpCreditBigQuery.ts";
 type JsonRecord = Record<string, unknown>;
 type GcpCreditConfig = {
   total?: unknown;
   remaining?: unknown;
   expiresAt?: unknown;
   currency?: unknown;
+  auto?: GcpCreditAutoConfig;
 };
 
 function asFiniteNumber(value: unknown): number | null {
@@ -40,18 +42,45 @@ function asFiniteNumber(value: unknown): number | null {
   return null;
 }
 
-function buildGcpCreditQuota(config: GcpCreditConfig | null | undefined): UsageQuota | null {
-  if (!config || typeof config !== "object") return null;
-  const remaining = asFiniteNumber(config.remaining);
-  if (remaining === null || remaining < 0) return null;
+async function buildGcpCreditQuota(
+  connectionId: string,
+  config: GcpCreditConfig | null | undefined
+): Promise<UsageQuota | null> {
+  if (!config || typeof config !== "object") {
+    return null;
+  }
+
+  let remaining = asFiniteNumber(config.remaining);
+  let source = "config";
+
+  if (config.auto?.enabled && config.auto.baseline?.remaining !== undefined) {
+    const baselineRemaining = asFiniteNumber(config.auto.baseline.remaining);
+    if (baselineRemaining !== null && baselineRemaining >= 0) {
+      const delta = await fetchBigQueryCreditDelta(connectionId, config.auto);
+      if (delta !== null) {
+        remaining = Math.max(0, baselineRemaining - delta);
+        source = "bigquery";
+      } else {
+        remaining = asFiniteNumber(config.remaining) ?? baselineRemaining;
+      }
+    }
+  }
+
+  if (remaining === null || remaining < 0) {
+    return null;
+  }
+
   const totalRaw = asFiniteNumber(config.total);
-  const total = totalRaw !== null && totalRaw > 0 ? totalRaw : 0;
+  const total = totalRaw !== null && totalRaw >= 0 ? totalRaw : 0;
   const used = total > 0 ? Math.max(0, total - remaining) : 0;
   const resetAt = parseResetTime(config.expiresAt);
   const currency =
     typeof config.currency === "string" && config.currency.trim() !== ""
       ? config.currency.trim().toUpperCase()
       : "USD";
+
+  const creditDetails =
+    source === "bigquery" ? [{ name: "Source", value: "BigQuery Auto Refresh" }] : undefined;
 
   return {
     used,
@@ -67,6 +96,7 @@ function buildGcpCreditQuota(config: GcpCreditConfig | null | undefined): UsageQ
     displayName: "Google Cloud Credit",
     quotaSource: "gcpCreditConfig",
     currency,
+    details: creditDetails,
   };
 }
 
@@ -90,7 +120,8 @@ export async function getVertexUsage(
 ) {
   if (!connectionId) return { message: "Vertex connected. Connection unavailable usage tracking." };
 
-  const gcpCreditQuota = buildGcpCreditQuota(
+  const gcpCreditQuota = await buildGcpCreditQuota(
+    connectionId,
     providerSpecificData?.gcpCredit as GcpCreditConfig | undefined
   );
 
