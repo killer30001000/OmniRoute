@@ -431,6 +431,7 @@ export default function EditConnectionModal({
               ]
             : [],
         },
+        ...getVertexGcpCreditInitialState(connection.providerSpecificData),
       });
       const existing = connection.providerSpecificData?.extraApiKeys;
       setExtraApiKeys(Array.isArray(existing) ? existing : []);
@@ -561,7 +562,12 @@ export default function EditConnectionModal({
         setSaving(false);
         return;
       }
-      if (!data.gcpCreditBaselineRemaining || !data.gcpCreditBaselineAsOf) {
+      if (
+        data.gcpCreditBaselineRemaining === "" ||
+        data.gcpCreditBaselineRemaining === null ||
+        data.gcpCreditBaselineRemaining === undefined ||
+        !data.gcpCreditBaselineAsOf
+      ) {
         setSaveError(
           "Google Cloud Credit Auto Refresh requires Baseline Remaining and Baseline Timestamp."
         );
