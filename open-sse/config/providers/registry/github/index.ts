@@ -48,6 +48,14 @@ export const githubProvider: RegistryEntry = {
       supportedThinkingEfforts: ["low", "medium", "high", "xhigh", "max"],
     },
     {
+      // gpt-6-sol requires the Copilot Responses endpoint for tools.
+      id: "gpt-6-sol",
+      name: "GPT-6 Sol",
+      targetFormat: "openai-responses",
+      toolCalling: true,
+      supportsReasoning: true,
+    },
+    {
       id: "gpt-5.6-sol",
       name: "GPT-5.6 Sol",
       targetFormat: "openai-responses",
