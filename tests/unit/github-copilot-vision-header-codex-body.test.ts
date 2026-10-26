@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 const { GithubExecutor } = await import("../../open-sse/executors/github.ts");
 const { GheCopilotExecutor } = await import("../../open-sse/executors/ghe-copilot.ts");
 const { getModelTargetFormat } = await import("../../open-sse/config/providerModels.ts");
+const { openaiToOpenAIResponsesRequest } = await import("../../open-sse/translator/request/openai-responses/toResponses.ts");
 const { supportsMaxTokens } = await import("../../src/lib/modelCapabilities.ts");
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
@@ -25,6 +26,35 @@ test("gpt-6-sol uses Responses on GitHub Copilot", () => {
   assert.equal(getModelTargetFormat("gh", "gpt-6-sol"), "openai-responses");
   assert.equal(getModelTargetFormat("github", "gpt-6-sol"), "openai-responses");
   assert.match(executor.buildUrl("gpt-6-sol", false), /\/responses$/);
+});
+
+test("Responses translation preserves flat function tool names and Chat function tools", () => {
+  const body = {
+    messages: [{ role: "user", content: "Call the test tool" }],
+    tools: [{
+      type: "function",
+      name: "flat_test_tool",
+      description: "A flat Responses function",
+      parameters: { type: "object", properties: {} },
+    }],
+  };
+  const flat = openaiToOpenAIResponsesRequest("gpt-6-sol", body, false, {}) as {
+    tools: Array<Record<string, unknown>>;
+  };
+  assert.equal(flat.tools[0].name, "flat_test_tool");
+  assert.equal(flat.tools[0].strict, undefined);
+
+  const nested = openaiToOpenAIResponsesRequest(
+    "gpt-6-sol",
+    {
+      ...body,
+      tools: [{ type: "function", function: { name: "nested_test_tool", parameters: { type: "object", properties: {} } } }],
+    },
+    false,
+    {}
+  ) as { tools: Array<Record<string, unknown>> };
+  assert.equal(nested.tools[0].name, "nested_test_tool");
+  assert.equal(nested.tools[0].strict, false);
 });
 
 test("GHE honors the per-request targetFormat from the synced catalog", () => {
