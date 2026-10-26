@@ -20,6 +20,13 @@ test("an uncatalogued codex id gets a Responses body to match its /responses URL
   assert.equal(getModelTargetFormat("ghe-copilot", "gpt-7.2-codex"), "openai-responses");
 });
 
+test("gpt-6-sol uses Responses on GitHub Copilot", () => {
+  const executor = new GithubExecutor();
+  assert.equal(getModelTargetFormat("gh", "gpt-6-sol"), "openai-responses");
+  assert.equal(getModelTargetFormat("github", "gpt-6-sol"), "openai-responses");
+  assert.match(executor.buildUrl("gpt-6-sol", false), /\/responses$/);
+});
+
 test("GHE honors the per-request targetFormat from the synced catalog", () => {
   const executor = new GheCopilotExecutor();
   const creds = {
