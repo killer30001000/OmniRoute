@@ -441,6 +441,9 @@ export function openaiToOpenAIResponsesRequest(
     result.tools = root.tools.map((toolValue) => {
       const tool = toRecord(toolValue);
       if (tool.type === "function") {
+        // Responses tools already have top-level name/parameters/strict.
+        // Do not misinterpret them as nested Chat Completions tools.
+        if (typeof tool.name === "string" && tool.name.trim()) return toolValue;
         const fn = toRecord(tool.function);
         const name = toString(fn.name);
         return {
