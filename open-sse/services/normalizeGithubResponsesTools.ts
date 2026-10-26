@@ -33,7 +33,8 @@ export function normalizeGithubResponsesTools(body: unknown): number {
     // Do not invent a function identity when neither representation has a name.
     if (!name) return toolValue;
 
-    const { function: _legacyFunction, ...rest } = tool;
+    const rest = { ...tool };
+    delete rest.function;
     normalizedCount++;
     return {
       ...rest,
