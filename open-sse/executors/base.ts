@@ -72,6 +72,7 @@ import {
 import { obfuscateInBody } from "../services/claudeCodeObfuscation.ts";
 import { sanitizeClaudeToolSchemas } from "../translator/helpers/schemaCoercion.ts";
 import { sanitizeResponsesInputItems } from "../services/responsesInputSanitizer.ts";
+import { normalizeGithubResponsesTools } from "../services/normalizeGithubResponsesTools.ts";
 import { applySystemTransformPipeline, PROVIDER_CLAUDE } from "../services/systemTransforms.ts";
 import {
   fixToolPairs,
@@ -1412,6 +1413,16 @@ export class BaseExecutor {
           claudeOAuth: this.provider === "claude" && hasClaudeOAuthToken,
         });
         stripInternalBodyFields(transformedBody);
+
+        // GitHub Copilot /responses requires flat function declarations.
+        // Guard immediately before serialization: a mixed/nested tool array
+        // may be introduced after the Chat-to-Responses translator ran.
+        if (this.provider === "github" && /\/responses(?:\?|$)/i.test(url)) {
+          const flattened = normalizeGithubResponsesTools(transformedBody);
+          if (flattened > 0) {
+            log?.debug?.("TOOLS", `Flattened ${flattened} GitHub Responses function tools`);
+          }
+        }
 
         const shouldFingerprint =
           isCliCompatEnabled(fingerprintProvider) ||
