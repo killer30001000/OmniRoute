@@ -90,6 +90,7 @@ test("GitHub Copilot registry reflects the current supported model lineup", () =
 
   assert.deepEqual(ids, [
     "gpt-6-astra",
+    "gpt-6-sol",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-5.6-luna",
@@ -110,6 +111,7 @@ test("GitHub Copilot registry reflects the current supported model lineup", () =
   ]);
   for (const id of [
     "gpt-6-astra",
+    "gpt-6-sol",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-5.6-luna",
